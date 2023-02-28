@@ -1,22 +1,13 @@
-import sqlite3
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+from py_scripts import utility
+
+
 # ----------------------------------------------------------------------------------------
 # Попытка подбора суммы. В течение 20 минут проходит более 3х операций
-# со следующим шаблоном – каждая последующая меньше предыдущей, при этом отклонены все кроме 
+# со следующим шаблоном – каждая последующая меньше предыдущей, при этом отклонены все кроме
 # последней. Последняя операция (успешная) в такой цепочке считается мошеннической.
 # ----------------------------------------------------------------------------------------
-def select_amount_view():
-    with sqlite3.connect('database.db') as conn: 
-        cursor = conn.cursor()
+def select_amount_view(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         CREATE VIEW if not EXISTS STG_SEL_AMOUNT as
             SELECT
@@ -32,10 +23,10 @@ def select_amount_view():
     ''')
     conn.commit()
 
-def select_amount_data_view():
+
+def select_amount_data_view(conn):
     print('Идет поиск мошейнических операций с подбором сумм')
-    with sqlite3.connect('database.db') as conn: 
-        cursor = conn.cursor()
+    cursor = conn.cursor()
     cursor.executescript('''
         CREATE VIEW if not EXISTS STG_SEL_AMOUNT_DATA as
             SELECT
@@ -48,16 +39,16 @@ def select_amount_data_view():
                 result_3,
                 CAST((julianday(trans_date) - julianday(date_3))*24*60 as integer) as different_min
             FROM STG_SEL_AMOUNT
-            WHERE oper_result = 'SUCCESS' and result_1='REJECT' 
+            WHERE oper_result = 'SUCCESS' and result_1='REJECT'
             and result_2='REJECT' and result_3='REJECT'
             and CAST((julianday(trans_date) - julianday(date_3))*24*60 as integer)<20;
     ''')
     conn.commit()
     # select_amount_data_view()
 
-def select_amount_report_view():
-    with sqlite3.connect('database.db') as conn: 
-        cursor = conn.cursor()
+
+def select_amount_report_view(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         CREATE VIEW if not EXISTS STG_SET_AMOUNT_REPORT_ACC as
             SELECT
@@ -75,10 +66,10 @@ def select_amount_report_view():
     ''')
     conn.commit()
 
-def rep_fraud_select_amount_():
+
+def rep_fraud_select_amount_(conn):
     print('Построение отчета витрины данных по операциям с подбором сумм')
-    with sqlite3.connect('database.db') as conn: 
-        cursor = conn.cursor()
+    cursor = conn.cursor()
     cursor.executescript('''
         INSERT INTO REP_FRAUD (
             event_dt,
@@ -98,16 +89,13 @@ def rep_fraud_select_amount_():
     ''')
     conn.commit()
 
+
 # rep_fraud_select_amount_()
-
-
 # *********************************************************************************************************
 # Очистка временных таблиц по подбору сумм
 # *********************************************************************************************************
-
-def delet_select_amount_():
-    with sqlite3.connect('database.db') as conn: 
-        cursor = conn.cursor()
+def delet_select_amount_(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         DROP VIEW if exists STG_SEL_AMOUNT;
         DROP VIEW if exists STG_SEL_AMOUNT_DATA;
@@ -115,11 +103,11 @@ def delet_select_amount_():
     ''')
     conn.commit()
 
-def amount():
-    select_amount_view()
-    select_amount_data_view()
-    select_amount_report_view()
-    print(bcolors.OKBLUE + 'ПОСТРОЕНИЕ ОТЧЁТА ВИТРИНЫ ДАННЫХ ПО ОПЕРАЦИЯМ С ПОПЫТКОЙ ПОДБОРА СУММ'+ bcolors.ENDC)
-    rep_fraud_select_amount_()
-    delet_select_amount_()
 
+def amount(conn):
+    select_amount_view(conn)
+    select_amount_data_view(conn)
+    select_amount_report_view(conn)
+    print(utility.bcolors.OKBLUE + 'ПОСТРОЕНИЕ ОТЧЁТА ВИТРИНЫ ДАННЫХ ПО ОПЕРАЦИЯМ С ПОПЫТКОЙ ПОДБОРА СУММ' + utility.bcolors.ENDC)
+    rep_fraud_select_amount_(conn)
+    delet_select_amount_(conn)
