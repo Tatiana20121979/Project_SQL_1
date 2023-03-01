@@ -1,23 +1,12 @@
-import sqlite3
 from py_scripts import utility
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+
+
 # ----------------------------------------------------------------------------------------
 # Отлов мошейнических операций с паспортами
 # ----------------------------------------------------------------------------------------
 # создаем таблицу с данными не действующих клиентов
-
-def not_valid_passport_clients():
-    with sqlite3.connect('database.db') as conn: 
-        cursor = conn.cursor()
+def not_valid_passport_clients(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         CREATE TABLE if not exists STG_CLIENT_NOT_VALID (
             client_id varchar(128),
@@ -30,9 +19,8 @@ def not_valid_passport_clients():
     conn.commit()
 
 
-def data_for_not_valid_passport():
-    with sqlite3.connect('database.db') as conn: 
-        cursor = conn.cursor()
+def data_for_not_valid_passport(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         INSERT INTO STG_CLIENT_NOT_VALID(
             client_id,
@@ -40,17 +28,17 @@ def data_for_not_valid_passport():
             fio,
             phone,
             passport_valid_to
-        ) 
-        SELECT 
-            client_id, 
+        )
+        SELECT
+            client_id,
             passport_num,
             last_name || ' ' || first_name || ' ' || patronymic as fio,
             phone,
             passport_valid_to
             FROM DWH_DIM_CLIENTS
             WHERE ? > passport_valid_to or passport_num in (
-                SELECT 
-                    passport_num 
+                SELECT
+                    passport_num
                 FROM DWH_FACT_PASSPORT_BLACKLIST
                 );
     ''')
@@ -58,9 +46,8 @@ def data_for_not_valid_passport():
 
 
 # Создаем представление которое покажет аккаунты по чёрным паспортам
-def view_accounts_passport():
-    with sqlite3.connect('database.db') as conn: 
-        cursor = conn.cursor()
+def view_accounts_passport(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         CREATE VIEW if not EXISTS STG_ACCOUNTS_NOT_VALID as
             SELECT
@@ -74,11 +61,10 @@ def view_accounts_passport():
     ''')
     conn.commit()
 
-# создаем представление что бы увидеть номера карт по чёрным паспортам
 
-def cards_passport():
-    with sqlite3.connect('database.db') as conn: 
-            cursor = conn.cursor()
+# создаем представление что бы увидеть номера карт по чёрным паспортам
+def cards_passport(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         CREATE VIEW if not EXISTS STG_CARDS_NOT_VALID as
             SELECT
@@ -95,9 +81,8 @@ def cards_passport():
 
 
 # создаем представление что бы увидеть транзакции совершенные по паспортам в черном списке
-def passport_fraud():
-    with sqlite3.connect('database.db') as conn: 
-            cursor = conn.cursor()
+def passport_fraud(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         CREATE VIEW if not EXISTS STG_PASSPORT_FRAUD as
             SELECT
@@ -112,9 +97,8 @@ def passport_fraud():
     conn.commit()
 
 
-def rep_fraud_passport():
-    with sqlite3.connect('database.db') as conn: 
-            cursor = conn.cursor()
+def rep_fraud_passport(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         INSERT INTO REP_FRAUD (
             event_dt,
@@ -141,10 +125,10 @@ def rep_fraud_passport():
     ''')
     conn.commit()
 
+
 # функция удаления данных из временных таблиц
-def delete_stg_black_passport():
-    with sqlite3.connect('database.db') as conn: 
-        cursor = conn.cursor()
+def delete_stg_black_passport(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         DROP TABLE if exists STG_CLIENT_NOT_VALID;
         DROP VIEW if exists STG_ACCOUNTS_NOT_VALID;
@@ -154,26 +138,25 @@ def delete_stg_black_passport():
     conn.commit()
 
 
-def fraud_black_passpory():
-    not_valid_passport_clients()
-    data_for_not_valid_passport()
-    view_accounts_passport()
-    cards_passport()
-    passport_fraud()
-    print(bcolors.OKBLUE + 'Поиск операций с паспортами черном списке'+ bcolors.ENDC)
-    # utility.show_data('STG_PASSPORT_FRAUD')
-    print(bcolors.OKBLUE + 'ПОСТРОЕНИЕ ОТЧЁТА ВИТРИНЫ ДАННЫХ ПО ОПЕРАЦИЯМ С ПАСПОРТАМИ В ЧЁРНОМ СПИСКЕ'+ bcolors.ENDC)
-    # utility.show_data('REP_FRAUD')
-    rep_fraud_passport()
-    delete_stg_black_passport()
+def fraud_black_passpory(conn):
+    not_valid_passport_clients(conn)
+    data_for_not_valid_passport(conn)
+    view_accounts_passport(conn)
+    cards_passport(conn)
+    passport_fraud(conn)
+    print(utility.bcolors.OKBLUE + 'Поиск операций с паспортами черном списке' + utility.bcolors.ENDC)
+    # utility.show_data('database.db', 'STG_PASSPORT_FRAUD')
+    print(utility.bcolors.OKBLUE + 'ПОСТРОЕНИЕ ОТЧЁТА ВИТРИНЫ ДАННЫХ ПО ОПЕРАЦИЯМ С ПАСПОРТАМИ В ЧЁРНОМ СПИСКЕ' + utility.bcolors.ENDC)
+    # utility.show_data('database.db', 'REP_FRAUD')
+    rep_fraud_passport(conn)
+    delete_stg_black_passport(conn)
 
 
 # ----------------------------------------------------------------------------------------------------------
 # ОТЛОВ НЕДЕЙСТВИТЕЛЬНЫХ ПАССПОРТОВ
 # ----------------------------------------------------------------------------------------------------------
-def over_passport_table():
-    with sqlite3.connect('database.db') as conn: 
-            cursor = conn.cursor()
+def over_passport_table(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         CREATE TABLE IF NOT EXISTS STG_OVER_PASSPORT as
             SELECT
@@ -181,19 +164,18 @@ def over_passport_table():
                 last_name||' '||first_name||' '||patronymic as fio,
                 passport_num,
                 phone,
-                passport_valid_to	
+                passport_valid_to
             FROM DWH_DIM_CLIENTS
             WHERE passport_valid_to is not null and passport_num not in (
-                SELECT 
+                SELECT
                     passport_num
                 FROM DWH_FACT_PASSPORT_BLACKLIST);
     ''')
     conn.commit()
 
 
-def over_passport_account_view():
-    with sqlite3.connect('database.db') as conn: 
-            cursor = conn.cursor()
+def over_passport_account_view(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         CREATE VIEW if not EXISTS STG_OVER_ACCOUNTS as
             SELECT
@@ -205,14 +187,12 @@ def over_passport_account_view():
             FROM DWH_DIM_ACCOUNTS t1
             INNER JOIN STG_OVER_PASSPORT t2
             on t1.client=t2.client_id;
-	''')
+    ''')
     conn.commit()
 
 
-
-def over_passport_cards_view():
-    with sqlite3.connect('database.db') as conn: 
-            cursor = conn.cursor()
+def over_passport_cards_view(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         CREATE VIEW if not EXISTS STG_OVER_CARDS as
             SELECT
@@ -228,9 +208,9 @@ def over_passport_cards_view():
     ''')
     conn.commit()
 
-def over_passport_fraud_view():
-    with sqlite3.connect('database.db') as conn: 
-            cursor = conn.cursor()
+
+def over_passport_fraud_view(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         CREATE VIEW if not EXISTS STG_OVER_PASSPORT_FRAUD as
             SELECT
@@ -249,10 +229,8 @@ def over_passport_fraud_view():
     conn.commit()
 
 
-
-def rep_fraud_over_passport():
-    with sqlite3.connect('database.db') as conn: 
-            cursor = conn.cursor()
+def rep_fraud_over_passport(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         INSERT INTO REP_FRAUD (
             event_dt,
@@ -279,10 +257,10 @@ def rep_fraud_over_passport():
     ''')
     conn.commit()
 
+
 # функция удаления данных из временных таблиц с недействительным пасспортом
-def delete_stg_over_passport():
-    with sqlite3.connect('database.db') as conn: 
-        cursor = conn.cursor()
+def delete_stg_over_passport(conn):
+    cursor = conn.cursor()
     cursor.executescript('''
         DROP TABLE if exists STG_OVER_PASSPORT;
         DROP VIEW if exists STG_OVER_ACCOUNTS;
@@ -292,18 +270,15 @@ def delete_stg_over_passport():
     conn.commit()
 
 
-def fraud_over_passpory():
-    over_passport_table()
-    over_passport_account_view()
-    over_passport_cards_view()
-    over_passport_fraud_view()
-    print(bcolors.OKBLUE + 'Поиск операций с просроченными паспортами'+ bcolors.ENDC)
+def fraud_over_passpory(conn):
+    over_passport_table(conn)
+    over_passport_account_view(conn)
+    over_passport_cards_view(conn)
+    over_passport_fraud_view(conn)
+    print(utility.bcolors.OKBLUE + 'Поиск операций с просроченными паспортами' + utility.bcolors.ENDC)
     # print('Поиск операций с просроченными паспортами')
-    # utility.show_data('STG_OVER_PASSPORT_FRAUD')
-    print(bcolors.OKBLUE + 'ПОСТРОЕНИЕ ОТЧЁТА ВИТРИНЫ ДАННЫХ ПО ОПЕРАЦИЯМ С ПРОСРОЧЕННЫМИ ПАСПОРТАМИ'+ bcolors.ENDC)
-    # utility.show_data('REP_FRAUD')
-    rep_fraud_over_passport()
-    delete_stg_over_passport()
-
-
-
+    # utility.show_data('database.db', 'STG_OVER_PASSPORT_FRAUD')
+    print(utility.bcolors.OKBLUE + 'ПОСТРОЕНИЕ ОТЧЁТА ВИТРИНЫ ДАННЫХ ПО ОПЕРАЦИЯМ С ПРОСРОЧЕННЫМИ ПАСПОРТАМИ' + utility.bcolors.ENDC)
+    # utility.show_data('database.db', 'REP_FRAUD')
+    rep_fraud_over_passport(conn)
+    delete_stg_over_passport(conn)
